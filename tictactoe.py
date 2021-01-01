@@ -1,5 +1,6 @@
 """Implementation of Tic-tac-toe using Python's turtle library.""" # TODO: update docstrings
 # TODO: make it so that the board is drawn in main and remove it from constructors
+# TODO: have popup say "Computer Won" if game was PvC
 
 import turtle
 from typing import List, Tuple, Dict, Optional
@@ -156,6 +157,17 @@ class TicTacToe: # try to fix spam clicking glitch - put "turtle.onscreenclick(N
         self.o.circle(70)
         self.o.pu()
 
+    def draw(self, player: List[int], index: int, mark: str) -> None: # TODO: see if it's reasonable to add check_wins to this method
+        if not (mark == "X" or mark == "O"):
+            raise ValueError("Mark must be an \"X\" or an \"O\"")
+        section: Section = self.grid[index]
+        player.append(index)
+        section.val = mark
+        if mark == "X":
+            self.draw_X(section.draw_start_pos)
+        else:
+            self.draw_O(section.draw_start_pos)
+
     def won(self, player: List[int], wins: List[List[int]]) -> bool:
         for i in wins:
             if sub(i, player):
@@ -174,10 +186,12 @@ class TicTacToe: # try to fix spam clicking glitch - put "turtle.onscreenclick(N
             self.end_game()
 
     def end_game(self):
+        turtle.Screen().title("Game Over!")
         response = turtle.textinput("Game Over!", f"{self.winner}!\n"
         "Enter 1 to play against a friend\n"
         "Enter 2 to play against the computer on easy mode\n"
-        "Enter 3 to play against the computer on hard mode\n"
+        "Enter 3 to play against the computer on medium mode\n"
+        "Enter 4 to play against the computer on hard mode\n"
         "Press Enter or click Cancel to quit")
         self.x.clear()
         self.o.clear()
@@ -187,6 +201,8 @@ class TicTacToe: # try to fix spam clicking glitch - put "turtle.onscreenclick(N
         elif response == "2":
             PvC("easy")
         elif response == "3":
+            PvC("medium")
+        elif response == "4":
             PvC("hard")
         else:
             turtle.Screen().bye()
@@ -195,11 +211,13 @@ class TicTacToe: # try to fix spam clicking glitch - put "turtle.onscreenclick(N
         pass
 
 
-class PvC(TicTacToe): # TODO: make medium mode that uses potential_wins method but chooses a random spot otherwise
+class PvC(TicTacToe):
 
     def __init__(self, mode: str):
+        turtle.Screen().title("Playing versus Computer")
         super().__init__()
         self.mode = mode
+        turtle.Screen().title(f"Player vs. Computer ({self.mode} mode)")
         turtle.onscreenclick(self.click)
 
     def click(self, x: float, y: float) -> None:
@@ -208,59 +226,65 @@ class PvC(TicTacToe): # TODO: make medium mode that uses potential_wins method b
             return
         user_sec: Section = self.grid[user_ind]
         if user_sec.val == "":
-            self.p1.append(user_ind)
-            user_sec.val = "X"
-            super().draw_X(user_sec.draw_start_pos)
+            self.draw(self.p1, user_ind, "X")
             super().check_wins()
+        else:
+            return
         if self.winner != "":
             return
         elif self.mode == "easy": # TODO: move calls to check_wins in hard_mode to click method
             self.easy_mode()
+        elif self.mode == "medium": # TODO: adjust whole program to add medium mode (textinput prompts)
+            self.med_mode()
         else:
             self.hard_mode()
 
     def easy_mode(self) -> None:
         comp_ind: int = choice([i for i in range(len(self.grid)) if self.grid[i].val == ""])
-        comp_sec: Section = self.grid[comp_ind]
-        self.p2.append(comp_ind)
-        comp_sec.val = "O"
-        super().draw_O(comp_sec.draw_start_pos)
+        self.draw(self.p2, comp_ind, "O")
+        super().check_wins()
+
+    def med_mode(self) -> None:
+        comp_ind: int
+        if len(self.potential_wins(self.p2)) >= 1:
+            comp_ind = choice(self.potential_wins(self.p2))[1]
+        elif len(self.potential_wins(self.p1)) >= 1:
+            comp_ind = choice(self.potential_wins(self.p1))[1]
+        else:
+            comp_ind = choice([i for i in range(len(self.grid)) if self.grid[i].val == ""])
+        self.draw(self.p2, comp_ind, "O")
+
         super().check_wins()
 
     def hard_mode(self) -> None:
-    # TODO: draw method - def draw(player: List[int], ind: int) - refer to repeated lines where stuff was drawn (dont draw if spot is taken)
         comp_ind: int
-        comp_sec: Section
         if len(self.p1) == 1:
             if self.p1[0] != 4:
                 comp_ind = 4
             else:
                 comp_ind = choice([i for i in range(len(self.grid)) if i % 2 == 0 and i != 4])
-            comp_sec = self.grid[comp_ind]
-            self.p2.append(comp_ind)
-            comp_sec.val = "O"
-            super().draw_O(comp_sec.draw_start_pos)
         # check potential_wins if comp can win
         elif len(self.potential_wins(self.p2)) >= 1:
             comp_ind = choice(self.potential_wins(self.p2))[1]
-            comp_sec = self.grid[comp_ind]
-            self.p2.append(comp_ind)
-            comp_sec.val = "O"
-            super().draw_O(comp_sec.draw_start_pos)
         # check potential_wins if user is about to win; if so, block them
         elif len(self.potential_wins(self.p1)) >= 1:
             comp_ind = choice(self.potential_wins(self.p1))[1]
-            comp_sec = self.grid[comp_ind]
-            self.p2.append(comp_ind)
-            comp_sec.val = "O"
-            super().draw_O(comp_sec.draw_start_pos)
         # elif comp makes a move, if p1 could win in 2 ways b/c of that move, don't do it
         else:
-            comp_ind: int = choice(self.rand_good_move())
-            comp_sec: Section = self.grid[comp_ind]
-            self.p2.append(comp_ind)
-            comp_sec.val = "O"
-            super().draw_O(comp_sec.draw_start_pos)
+            good_moves: List[int] = self.rand_good_move()
+            chances_to_win: List[int] = []
+            for i in good_moves:
+                self.p2.append(i)
+                self.grid[i].val = "O"
+                if len(self.potential_wins(self.p2)) >= 1:
+                    chances_to_win.append(i)
+                self.p2.pop()
+                self.grid[i].val = ""
+            if len(chances_to_win) > 0:
+                comp_ind = choice(chances_to_win)
+            else:
+                comp_ind = choice(good_moves)
+        self.draw(self.p2, comp_ind, "O")
 
         super().check_wins()
 
@@ -269,27 +293,20 @@ class PvC(TicTacToe): # TODO: make medium mode that uses potential_wins method b
         almost_wins: List[Tuple[int, int]] = [i[0] for i in POTENTIAL_WINS] # TODO: rename variable
         missing: List[int] = [i[1] for i in POTENTIAL_WINS] # TODO: rename variable
         for i in sublists(player): # TODO: potentially make a list attribute to track the tuples that are already taken care of
-            if i in almost_wins and self.grid[missing[almost_wins.index(i)]].val == "": # TODO TODO TODO TODO TODO cmd+F - sort
+            if i in almost_wins and self.grid[missing[almost_wins.index(i)]].val == "":
                 wins.append(POTENTIAL_WINS[almost_wins.index(i)])
         return wins
 
     def rand_good_move(self) -> List[int]:
-        # elif comp makes a random move, if p1 could win in 2 ways b/c of that move, don't do it
-        # make list of good moves and choose one at random
         available = [i for i in range(len(self.grid)) if self.grid[i].val == ""]
         good_moves: List[int] = []
-        # bad_comp_move: bool = False
-        print(available)
         for i in available:
             bad_comp_move: bool = False
             self.p2.append(i)
             self.grid[i].val = "O"
             for j in [k for k in available if k != i]:
-                self.p1.append(j) # make a new sorted variable
+                self.p1.append(j)
                 self.grid[j].val = "X"
-                print(sorted(self.p1))
-                print("------ ",self.potential_wins(self.p1))
-                print("------ ",self.potential_wins(self.p2))
                 if len(self.potential_wins(self.p1)) >= 2 and len(self.potential_wins(self.p2)) == 0:
                     bad_comp_move = True
                     self.p1.pop()
@@ -298,69 +315,69 @@ class PvC(TicTacToe): # TODO: make medium mode that uses potential_wins method b
                 else:
                     self.p1.pop()
                     self.grid[j].val = ""
-            print("**************************************")
             if not bad_comp_move:
                 good_moves.append(i)
             self.p2.pop()
             self.grid[i].val = ""
-        print(good_moves)
         return good_moves
+
 
 class PvP(TicTacToe):
 
     def __init__(self):
+        turtle.Screen().title("Player vs. Player mode")
         self.turn: str = "X"
         super().__init__()
         turtle.onscreenclick(self.click)
 
     def click(self, x: float, y: float) -> None:
-        sec_ind = super().get_sec_ind(x, y)
-        if sec_ind is None:
+        section_ind = super().get_sec_ind(x, y)
+        if section_ind is None:
             return
-        sec: Section = self.grid[sec_ind]
-        if sec.val == "":
+        if self.grid[section_ind].val == "":
             if self.turn == "X":
-                self.p1.append(sec_ind)
-                sec.val = self.turn
-                super().draw_X(sec.draw_start_pos)
+                self.draw(self.p1, section_ind, "X")
                 self.turn = "O"
             elif self.turn == "O":
-                self.p2.append(sec_ind)
-                sec.val = self.turn
-                super().draw_O(sec.draw_start_pos)
+                self.draw(self.p2, section_ind, "O")
                 self.turn = "X"
             super().check_wins()
 
 
 def main() -> None:
     turtle.screensize(WIDTH, HEIGHT)
+    turtle.Screen().title("Tic Tac Toe")
     turtle.speed(10)
     turtle.ht()
-    # user_input = turtle.textinput("Welcome to Tic Tac Toe!", "Enter 1 to play against a friend\n"
-    # "Enter 2 to play against the computer on easy mode\n"
-    # "Enter 3 to play against the computer on hard mode\n"
-    # "Enter anything else or click Cancel to quit")
-    PvC("hard")
-    # if user_input == "1":
-    #     PvP()
-    # elif user_input == "2":
-    #     PvC("easy")
-    # elif user_input == "3":
-    #     PvC("hard")
-    # else:
-    #     turtle.Screen().bye()
+    user_input = turtle.textinput("Welcome to Tic Tac Toe!", "Enter 1 to play against a friend\n"
+    "Enter 2 to play against the computer on easy mode\n"
+    "Enter 3 to play against the computer on medium mode\n"
+    "Enter 4 to play against the computer on hard mode\n"
+    "Enter anything else or click Cancel to quit")
+    if user_input == "1":
+        PvP()
+    elif user_input == "2":
+        PvC("easy")
+    elif user_input == "3":
+        PvC("medium")
+    elif user_input == "4":
+        PvC("hard")
+    else:
+        turtle.Screen().bye()
 
     turtle.done()
 
 
 def sub(a: List[int], b: List[int]) -> bool:
+    """Determines if every element in one list can be found in another list."""
     for i in a:
         if i not in b:
             return False
     return True
 
 
-def sublists(input: List[int]) -> List[Tuple[int, int]]: # finds all combinations of length 2 pairs in a list
+def sublists(input: List[int]) -> List[Tuple[int, int]]:
+    """Finds all combinations of length 2 pairs in a list."""
     input_sorted: List[int] = sorted(input)
     result: List[Tuple[int, int]] = []
     for i in range(len(input) - 1):
